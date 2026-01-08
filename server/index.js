@@ -7,7 +7,8 @@ const app = express();
 app.use(cors());
 
 app.get('/', (req, res) => {
-  res.send('Atmosphere Server is Online');
+  console.log('Health check received at:', new Date().toISOString());
+  res.status(200).send('Atmosphere Server is Online');
 });
 
 const server = http.createServer(app);
@@ -51,6 +52,10 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT} (0.0.0.0)`);
+});
+
+server.on('error', (err) => {
+  console.error('CRITICAL SERVER ERROR:', err);
 });
