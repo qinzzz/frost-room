@@ -2,12 +2,22 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { VibeAnalysis } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const getAI = () => {
+  const apiKey = ((import.meta as any).env?.VITE_GEMINI_API_KEY) || (process.env?.GEMINI_API_KEY);
+  if (!apiKey) {
+    console.warn("Gemini API key not found. AI features will be disabled.");
+    return null;
+  }
+  return new GoogleGenAI({ apiKey });
+};
+
+const ai = getAI();
 
 export async function analyzeRoomVibe(count: number): Promise<VibeAnalysis> {
   try {
+    if (!ai) throw new Error("AI not initialized");
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.5-flash',
       contents: `Current room status: ${count} users present in a frosted glass digital lounge. Provide a poetic 1-sentence analysis of the mood and one suggested action.`,
       config: {
         responseMimeType: "application/json",
@@ -32,6 +42,7 @@ export async function analyzeRoomVibe(count: number): Promise<VibeAnalysis> {
       },
     });
 
+    console.log("Gemini Room Vibe Response:", response);
     const text = response.text;
     if (!text) return {
       message: "A quiet hum of digital existence fills the space.",
@@ -52,27 +63,18 @@ export async function analyzeRoomVibe(count: number): Promise<VibeAnalysis> {
 
 export async function getPoeticLocation(lat: number, lng: number): Promise<string> {
   try {
+    if (!ai) throw new Error("AI not initialized");
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash",
       contents: `Identify the city and country for latitude ${lat} and longitude ${lng}. Then, provide a concise poetic identifier for this place (maximum 5 words). Example: 'Emerald Seattle' or 'Golden Kyoto'. Return ONLY the identifier text.`,
-      config: {
-        tools: [{ googleMaps: {} }],
-        toolConfig: {
-          retrievalConfig: {
-            latLng: {
-              latitude: lat,
-              longitude: lng
-            }
-          }
-        }
-      },
     });
 
+    console.log("Gemini Location Response:", response);
     const generatedText = response.text;
     if (generatedText) {
       return generatedText.trim();
     }
-    
+
     return "Common Ground";
   } catch (error) {
     console.error("Location Service Error:", error);
