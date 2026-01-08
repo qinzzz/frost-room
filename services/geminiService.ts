@@ -52,7 +52,6 @@ export async function analyzeRoomVibe(count: number): Promise<VibeAnalysis> {
 
 export async function getPoeticLocation(lat: number, lng: number): Promise<string> {
   try {
-    // Explicitly passing coordinates in the prompt text as well as the toolConfig for maximum reliability.
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: `Identify the city and country for latitude ${lat} and longitude ${lng}. Then, provide a concise poetic identifier for this place (maximum 5 words). Example: 'Emerald Seattle' or 'Golden Kyoto'. Return ONLY the identifier text.`,
@@ -69,7 +68,6 @@ export async function getPoeticLocation(lat: number, lng: number): Promise<strin
       },
     });
 
-    // Safely handle potential undefined response.text
     const generatedText = response.text;
     if (generatedText) {
       return generatedText.trim();
