@@ -9,7 +9,7 @@ app.use(cors());
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: process.env.FRONTEND_URL || "*",
     methods: ["GET", "POST"]
   }
 });
@@ -30,7 +30,7 @@ io.on('connection', (socket) => {
       lng: data.lng,
       id: socket.id
     };
-    
+
     // Broadcast the full list of users with locations to all clients
     io.emit('users_list', Object.values(users));
     io.emit('online_count', Object.keys(users).length);
@@ -39,7 +39,7 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.id}`);
     delete users[socket.id];
-    
+
     // Broadcast updated list and count
     io.emit('users_list', Object.values(users));
     io.emit('online_count', Object.keys(users).length);
