@@ -6,13 +6,11 @@ import { getPoeticLocation } from './services/geminiService';
 import { fetchCountryFromCoords } from './services/locationService';
 
 import { socketService } from './services/socketService';
+import { ASSET_URLS, ASSETS } from './services/figureAssets';
 
 const INITIAL_USERS = 0;
 
-export type PoseType = 'walking_left' | 'walking_right' | 'standing_casual' | 'standing_tall' | 'profile';
-
 export interface RealisticUserFigure extends UserFigure {
-  pose: PoseType;
   country: string;
 }
 
@@ -30,9 +28,10 @@ const calculateHaversineDistance = (lat1: number, lon1: number, lat2: number, lo
 
 const App: React.FC = () => {
   const [onlineCount, setOnlineCount] = useState(INITIAL_USERS);
-  const [blurAmount, setBlurAmount] = useState(60);
+  const [blurAmount, setBlurAmount] = useState(8);
   const [glassOpacity, setGlassOpacity] = useState(20);
   const [baseSpeed, setBaseSpeed] = useState(2.2);
+  const [figureScale, setFigureScale] = useState(3);
   const [figures, setFigures] = useState<RealisticUserFigure[]>([]);
   const [isControlsOpen, setIsControlsOpen] = useState(false);
   const [inputValue, setInputValue] = useState(INITIAL_USERS.toString());
@@ -98,17 +97,40 @@ const App: React.FC = () => {
   const figureMetadata = React.useRef<Record<string, Partial<RealisticUserFigure>>>({});
 
   useEffect(() => {
-    if (!coords || remoteUsers.length === 0) {
-      if (remoteUsers.length === 0) setFigures([]);
-      return;
+    if (!coords) return;
+
+    // Combine actual users with ghost users to match onlineCount density
+    const actualUsers = remoteUsers;
+    const totalNeeded = Math.min(120, onlineCount);
+    const combinedUsers = [...actualUsers];
+
+    // Add ghost users if needed
+    if (combinedUsers.length < totalNeeded) {
+      const ghostsCount = totalNeeded - combinedUsers.length;
+      for (let i = 0; i < ghostsCount; i++) {
+        // Use deterministic offsets to keep ghosts stable
+        const angle = i * 137.5; // Golden angle
+        const radius = Math.sqrt(i + 1) * 2.0; // Geographic degree offset roughly
+        combinedUsers.push({
+          id: `ghost-${i}`,
+          lat: coords.lat + (radius * Math.cos(angle * Math.PI / 180) * 0.1),
+          lng: coords.lng + (radius * Math.sin(angle * Math.PI / 180) * 0.1),
+          isGhost: true
+        } as any);
+      }
     }
 
-    const visualUsers = remoteUsers.slice(0, 120);
+    const visualUsers = combinedUsers.slice(0, 120);
 
     const userDistances = visualUsers.map((user, i) => {
       const dist = calculateHaversineDistance(coords.lat, coords.lng, user.lat, user.lng);
-      return { dist, index: i, userId: user.id };
+      return { dist, index: i, userId: user.id, isGhost: (user as any).isGhost };
     });
+
+    if (userDistances.length === 0) {
+      if (figures.length > 0) setFigures([]);
+      return;
+    }
 
     const distances = userDistances.map(ud => ud.dist);
     const minDist = Math.min(...distances);
@@ -117,43 +139,31 @@ const App: React.FC = () => {
 
     const newFigures: RealisticUserFigure[] = userDistances.map((ud) => {
       const normalizedFactor = (ud.dist - minDist) / range;
-      const D = 0.5 + (normalizedFactor * 9.5);
+      // Narrow the depth range to compress scale differences
+      const D = 1.2 + (normalizedFactor * 3.3);
 
-      const baseScale = 2 / D;
-      const alpha = 0.38;
+      // Compressed scale range (was 2/D)
+      // Compressed scale range (was 2/D) - Adjustable via figureScale state
+      const baseScale = figureScale / D;
+
+      const alpha = 0.25; // Gentler opacity falloff
       const opacity = Math.exp(-alpha * D);
-      const invD2 = 1 / (D * D);
-      const speed = baseSpeed * invD2;
+
+      const speedFactor = 1 / Math.sqrt(D); // Flatter speed curve
+      const speed = baseSpeed * speedFactor;
 
       // Get or create persistent metadata for this user
       if (!figureMetadata.current[ud.userId]) {
-        const r = Math.random();
-        let activity: 'walking' | 'standing' = 'walking';
-        let direction: 'left' | 'right' = 'right';
-        let pose: PoseType;
-
-        if (r < 0.45) {
-          activity = 'walking';
-          direction = 'left';
-          pose = 'walking_left';
-        } else if (r < 0.85) {
-          activity = 'walking';
-          direction = 'right';
-          pose = 'walking_right';
-        } else {
-          activity = 'standing';
-          direction = Math.random() > 0.5 ? 'left' : 'right';
-          const stationaryPoses: PoseType[] = ['standing_casual', 'standing_tall', 'profile'];
-          pose = stationaryPoses[Math.floor(Math.random() * stationaryPoses.length)];
-        }
+        const assetIndex = Math.floor(Math.random() * ASSETS.length);
+        const asset = ASSETS[assetIndex];
 
         figureMetadata.current[ud.userId] = {
           x: Math.random() * 100,
-          direction,
-          activity,
-          pose,
+          activity: asset.activity,
+          direction: asset.direction,
           bodyWidth: 0.85 + Math.random() * 0.2,
           torsoHeight: 1.1 + (Math.random() * 0.3),
+          assetIndex: assetIndex
         };
       }
 
@@ -168,17 +178,17 @@ const App: React.FC = () => {
         speed: speed,
         direction: meta.direction!,
         activity: meta.activity!,
-        pose: meta.pose!,
-        country: countryCache[ud.userId] || 'Locating...',
+        country: ud.isGhost ? 'Atmosphere' : (countryCache[ud.userId] || 'Locating...'),
         bodyWidth: meta.bodyWidth!,
         torsoHeight: meta.torsoHeight!,
         legHeight: 1.0,
         headSize: 1.0,
+        assetIndex: meta.assetIndex,
       };
     });
 
     setFigures(newFigures);
-  }, [remoteUsers, baseSpeed, coords, countryCache]);
+  }, [remoteUsers, onlineCount, baseSpeed, figureScale, coords, countryCache]);
 
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -278,9 +288,18 @@ const App: React.FC = () => {
             </div>
 
             <div className="flex flex-col gap-2">
+              <label className="text-[8px] uppercase tracking-[0.3em] text-neutral-500 font-bold">Figure Size</label>
+              <input
+                type="range" min="0.5" max="6.0" step="0.1" value={figureScale}
+                onChange={(e) => setFigureScale(parseFloat(e.target.value))}
+                className="w-full accent-neutral-400"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
               <label className="text-[8px] uppercase tracking-[0.3em] text-neutral-500 font-bold">Diffusion</label>
               <input
-                type="range" min="0" max="150" value={blurAmount}
+                type="range" min="0" max="50" value={blurAmount}
                 onChange={(e) => setBlurAmount(parseInt(e.target.value))}
                 className="w-full accent-neutral-400"
               />
@@ -289,7 +308,7 @@ const App: React.FC = () => {
             <div className="flex flex-col gap-2">
               <label className="text-[8px] uppercase tracking-[0.3em] text-neutral-500 font-bold">Frosting</label>
               <input
-                type="range" min="0" max="80" value={glassOpacity}
+                type="range" min="0" max="50" value={glassOpacity}
                 onChange={(e) => setGlassOpacity(parseInt(e.target.value))}
                 className="w-full accent-neutral-400"
               />

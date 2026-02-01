@@ -1,14 +1,19 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Deploy
+When pushing to main, the CI/CD pipeline will deploy both frontend and backend automatically.
 
-# Run and deploy your AI Studio app
+## Backend deployment
 
-This contains everything you need to run your app locally.
+This service is deployed on railway.com. Production URL: https://frost-room-production.up.railway.app.
 
-View your app in AI Studio: https://ai.studio/apps/drive/16qlRLd9rHnItx8M1eu8uoGEs0mLvO9xo
+If you want to modify deployment settings, you can join the railway project: https://railway.com/invite/opfirmTOri9.
 
-## Run Locally
+## Frontend deployment
+
+Vercel project: https://vercel.com/wangqinxin2018-gmailcoms-projects/frost-room.
+Url: https://frost-room.vercel.app. 
+
+
+# Run Locally
 
 **Prerequisites:** Node.js
 
@@ -21,7 +26,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/16qlRLd9rHnItx8M1eu8uoG
 3. Start the server:
    `npm start`
 
-The server will run on `http://localhost:3001`.
+The server will run on `http://localhost:3030`.
 
 ### 2. Frontend Application
 

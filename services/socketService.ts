@@ -1,6 +1,12 @@
 import { io, Socket } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+const DEV_URL = import.meta.env.VITE_SERVER_URL_DEV || 'http://localhost:3030';
+const PROD_URL = import.meta.env.VITE_SERVER_URL_PROD || 'https://frost-room-production.up.railway.app';
+const USE_PROD = import.meta.env.VITE_USE_PROD_URL === 'true';
+
+const SOCKET_URL = USE_PROD ? PROD_URL : DEV_URL;
+
+console.log(`Connecting to socket at: ${SOCKET_URL} (Mode: ${USE_PROD ? 'PROD' : 'DEV'})`);
 
 class SocketService {
     socket: Socket | null = null;

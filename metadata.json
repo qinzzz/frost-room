@@ -1,5 +1,5 @@
 {
-  "name": "Ethereal Lounge: Online Common Space",
+  "name": "virtual lounge",
   "description": "A poetic visualization of real-time presence. See fellow visitors as silhouettes behind a frosted glass partition, scaling with online density and enhanced by Gemini-driven mood analysis.",
   "requestFramePermissions": [
     "geolocation"

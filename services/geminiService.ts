@@ -65,7 +65,7 @@ export async function getPoeticLocation(lat: number, lng: number): Promise<strin
   try {
     if (!ai) throw new Error("AI not initialized");
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       contents: `Identify the city and country for latitude ${lat} and longitude ${lng}. Then, provide a concise poetic identifier for this place (maximum 5 words). Example: 'Emerald Seattle' or 'Golden Kyoto'. Return ONLY the identifier text.`,
     });
 
