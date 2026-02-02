@@ -1,38 +1,43 @@
+export interface LocationInfo {
+  city: string;
+  country: string;
+}
 
 /**
- * Fetches the country name for a given set of coordinates using a client-side friendly API.
- * BigDataCloud's Reverse Geocoding API is used here as it handles browser-based
- * CORS requests more reliably than Nominatim without requiring forbidden headers.
+ * Fetches the city and country name for a given set of coordinates using Nominatim API.
  */
-export async function fetchCountryFromCoords(lat: number, lng: number): Promise<string> {
+export async function fetchLocationFromCoords(lat: number, lng: number): Promise<LocationInfo> {
   try {
-    // BigDataCloud provides a free, no-key-required client-side reverse geocoding service.
-    const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`;
-    
-    const response = await fetch(url);
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`;
+
+    const response = await fetch(url, {
+      headers: {
+        'Accept-Language': 'en-US,en;q=0.9',
+        'User-Agent': 'FrostRoom/1.0' // Nominatim requires a User-Agent
+      }
+    });
 
     if (!response.ok) {
       throw new Error(`Geocoding error: ${response.status}`);
     }
 
     const data = await response.json();
-    
-    // The API returns countryName directly in the root object.
-    if (data.countryName) {
-      return data.countryName;
-    }
-    
-    // Fallback for bodies of water or remote areas where countryName might be empty
-    if (data.localityInfo && data.localityInfo.informative) {
-      const ocean = data.localityInfo.informative.find((i: any) => i.name.toLowerCase().includes('ocean'));
-      if (ocean) return 'International Waters';
-    }
 
-    return 'Unknown Region';
+    const address = data.address || {};
+    const city = address.city || address.town || address.village || address.suburb || address.city_district || 'Unknown City';
+    const country = address.country || 'Unknown Country';
+
+    return { city, country };
   } catch (error) {
-    console.error('Deterministic Geocoding Error:', error);
-    // If we fail, we return a fallback to prevent the app from appearing broken.
-    // 'Remote Territory' is a poetic way of saying the location couldn't be resolved.
-    return 'Remote Territory';
+    console.error('Nominatim Geocoding Error:', error);
+    return { city: 'Unknown City', country: 'Remote Territory' };
   }
+}
+
+/**
+ * Backwards compatibility wrapper for fetchCountryFromCoords
+ */
+export async function fetchCountryFromCoords(lat: number, lng: number): Promise<string> {
+  const { country } = await fetchLocationFromCoords(lat, lng);
+  return country;
 }

@@ -30,10 +30,23 @@ const io = new Server(server, {
 const users = {};
 
 io.on('connection', (socket) => {
-  console.log(`User connected: ${socket.id}`);
+  // Log current users and their coordinates
+  console.log(`[Connect] Socket: ${socket.id} | Total Online: ${io.engine.clientsCount}`);
 
-  // Initial update to all clients about the new user
-  io.emit('online_count', io.engine.clientsCount);
+  // Initial update to all clients (will be 0 or current count of users with coordinates)
+  io.emit('online_count', Object.keys(users).length);
+
+  // Log current users and their coordinates
+  console.log('--- Current Users Coordinates ---');
+  const userList = Object.values(users);
+  if (userList.length === 0) {
+    console.log('No users with registered coordinates yet.');
+  } else {
+    userList.forEach(u => {
+      console.log(`User ${u.id.substring(0, 6)}...: ${u.lat}, ${u.lng}`);
+    });
+  }
+  console.log('---------------------------------');
 
   socket.on('update_location', (data) => {
     // data should be { lat: number, lng: number }
@@ -45,17 +58,25 @@ io.on('connection', (socket) => {
 
     // Broadcast the updated list of users with locations
     io.emit('users_list', Object.values(users));
-    // We already emitted the count on connection, but let's sync just in case
-    io.emit('online_count', io.engine.clientsCount);
+
+    // Log current users and their coordinates on every update
+    console.log(`Current souls with coordinates: ${Object.keys(users).length}`);
+    Object.values(users).forEach(u => {
+      console.log(` > User ${u.id.substring(0, 6)}...: ${u.lat.toFixed(4)}, ${u.lng.toFixed(4)}`);
+    });
+    console.log('--------------------------------------');
+
+    // We emit the count of users who have registered coordinates
+    io.emit('online_count', Object.keys(users).length);
   });
 
   socket.on('disconnect', () => {
-    console.log(`User disconnected: ${socket.id}`);
     delete users[socket.id];
+    console.log(`[Disconnect] Socket: ${socket.id} | Total Online (with coords): ${Object.keys(users).length}`);
 
     // Broadcast updated list and count
     io.emit('users_list', Object.values(users));
-    io.emit('online_count', io.engine.clientsCount);
+    io.emit('online_count', Object.keys(users).length);
   });
 });
 

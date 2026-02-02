@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import CommonSpace from './components/CommonSpace';
 import { UserFigure } from './types';
 import { getPoeticLocation } from './services/geminiService';
-import { fetchCountryFromCoords } from './services/locationService';
+import { fetchLocationFromCoords, LocationInfo, fetchCountryFromCoords } from './services/locationService';
 import { fetchWeather } from './services/weatherService';
 import { WeatherCondition, WeatherIntensity } from './types';
 
@@ -96,6 +96,8 @@ const App: React.FC = () => {
   const [isControlsOpen, setIsControlsOpen] = useState(false);
   const [inputValue, setInputValue] = useState(INITIAL_USERS.toString());
   const [locationName, setLocationName] = useState<string | null>(null);
+  const [locationInfo, setLocationInfo] = useState<LocationInfo | null>(null);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [remoteUsers, setRemoteUsers] = useState<any[]>([]);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
@@ -107,6 +109,7 @@ const App: React.FC = () => {
   const [manualWeather, setManualWeather] = useState<WeatherCondition>('sunny');
   const [manualIntensity, setManualIntensity] = useState<WeatherIntensity>('light');
   const [isAutoWeather, setIsAutoWeather] = useState(true);
+  const [isAIEnabled, setIsAIEnabled] = useState(false);
 
   // Derived effective weather
   const weather = isAutoWeather ? liveWeather.condition : manualWeather;
@@ -155,16 +158,31 @@ const App: React.FC = () => {
     if (!coords) return;
 
     const updateLocationData = async () => {
-      // Update location on server
-      socketService.updateLocation(coords.lat, coords.lng);
+      setIsLoadingLocation(true);
+      try {
+        // Update location on server
+        socketService.updateLocation(coords.lat, coords.lng);
 
-      // Fetch new weather
-      const fetchedWeather = await fetchWeather(coords.lat, coords.lng);
-      setLiveWeather(fetchedWeather);
+        // Fetch new weather
+        const fetchedWeather = await fetchWeather(coords.lat, coords.lng);
+        setLiveWeather(fetchedWeather);
 
-      // Fetch new location name
-      const name = await getPoeticLocation(coords.lat, coords.lng);
-      setLocationName(name);
+        // Fetch new location name (Nominatim - Deterministic)
+        const info = await fetchLocationFromCoords(coords.lat, coords.lng);
+        setLocationInfo(info);
+
+        // Fetch poetic name (Gemini - Optional AI)
+        if (isAIEnabled) {
+          const name = await getPoeticLocation(coords.lat, coords.lng);
+          setLocationName(name);
+        } else {
+          setLocationName(null);
+        }
+      } catch (error) {
+        console.error("Failed to update location data:", error);
+      } finally {
+        setIsLoadingLocation(false);
+      }
     };
 
     updateLocationData();
@@ -460,14 +478,43 @@ const App: React.FC = () => {
       </div>
 
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-30 gap-2">
-        {locationName && (
-          <h1
-            className="text-[11px] font-bold uppercase tracking-[0.6em] select-none text-center animate-in fade-in duration-[4000ms] leading-[2.5] max-w-[40%] break-words transition-all duration-[3000ms] ease-in-out"
-            style={{ color: currentTheme.text, opacity: 0.6 }}
-          >
-            {locationName}
-          </h1>
-        )}
+        {/* Loading Placeholder */}
+        <div
+          className={`flex flex-col items-center gap-3 transition-all duration-[2000ms] ease-in-out ${isLoadingLocation ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none absolute'}`}
+        >
+          <div className="flex flex-col items-center gap-3 animate-pulse">
+            <div
+              className="h-3 w-48 rounded-full transition-all duration-[3000ms]"
+              style={{ backgroundColor: `${currentTheme.text}22` }}
+            ></div>
+            <div
+              className="h-2 w-32 rounded-full transition-all duration-[3000ms]"
+              style={{ backgroundColor: `${currentTheme.subText}11` }}
+            ></div>
+          </div>
+        </div>
+
+        {/* Location Content */}
+        <div
+          className={`flex flex-col items-center gap-2 transition-all duration-[3000ms] ease-in-out ${!isLoadingLocation && (locationName || locationInfo) ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none absolute'}`}
+        >
+          {locationName ? (
+            <h1
+              className="text-[11px] font-bold uppercase tracking-[0.6em] select-none text-center leading-[2.5] max-w-[40%] break-words transition-all duration-[3000ms] ease-in-out"
+              style={{ color: currentTheme.text, opacity: 0.6 }}
+            >
+              {locationName}
+            </h1>
+          ) : locationInfo && (
+            <h1
+              className="text-[11px] font-bold uppercase tracking-[0.5em] select-none text-center leading-[1.8] max-w-[95%] whitespace-nowrap transition-all duration-[3000ms] ease-in-out"
+              style={{ color: currentTheme.text, opacity: 0.6 }}
+            >
+              {locationInfo.city}<br />
+              <span className="text-[8px] opacity-70 tracking-[0.3em] font-medium">{locationInfo.country}</span>
+            </h1>
+          )}
+        </div>
         {coords && (
           <div className="flex flex-col items-center gap-1 transition-all duration-[3000ms] ease-in-out">
             <p
@@ -525,6 +572,39 @@ const App: React.FC = () => {
               >
                 Deterministic API: BigDataCloud
               </span>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label
+                className="text-[8px] uppercase tracking-[0.3em] font-bold transition-all duration-[3000ms]"
+                style={{ color: currentTheme.text, opacity: 0.8 }}
+              >
+                AI Features
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setIsAIEnabled(true)}
+                  className={`flex-1 py-1 rounded-md text-[10px] font-mono transition-all border duration-[3000ms] ${isAIEnabled ? 'text-white' : 'bg-transparent hover:border-neutral-400'}`}
+                  style={{
+                    backgroundColor: isAIEnabled ? currentTheme.text : 'transparent',
+                    borderColor: isAIEnabled ? currentTheme.text : `${currentTheme.text}44`,
+                    color: isAIEnabled ? (currentTheme.name === 'Night' || currentTheme.name === 'Sunset' ? '#000' : '#fff') : currentTheme.text
+                  }}
+                >
+                  On
+                </button>
+                <button
+                  onClick={() => setIsAIEnabled(false)}
+                  className={`flex-1 py-1 rounded-md text-[10px] font-mono transition-all border duration-[3000ms] ${!isAIEnabled ? 'text-white' : 'bg-transparent hover:border-neutral-400'}`}
+                  style={{
+                    backgroundColor: !isAIEnabled ? currentTheme.text : 'transparent',
+                    borderColor: !isAIEnabled ? currentTheme.text : `${currentTheme.text}44`,
+                    color: !isAIEnabled ? (currentTheme.name === 'Night' || currentTheme.name === 'Sunset' ? '#000' : '#fff') : currentTheme.text
+                  }}
+                >
+                  Off
+                </button>
+              </div>
             </div>
 
             <div className="flex flex-col gap-2">
