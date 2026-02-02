@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { RealisticUserFigure } from '../App';
-import { ASSET_URLS } from '../services/figureAssets';
+import { ASSETS, ASSET_URLS } from '../services/figureAssets';
 
 interface SilhouetteProps {
   figure: RealisticUserFigure;
@@ -34,8 +34,8 @@ const Silhouette: React.FC<SilhouetteProps> = ({ figure, blurAmount }) => {
         const multiplier = figure.activity === 'run' ? 2.5 : 1.0;
         const step = (figure.direction === 'left' ? -0.015 : 0.015) * figure.speed * multiplier;
         let next = prev + step;
-        if (next > 120) next = -20;
-        if (next < -20) next = 120;
+        if (next > 140) next = -40;
+        if (next < -40) next = 140;
         return next;
       });
     }
@@ -54,51 +54,66 @@ const Silhouette: React.FC<SilhouetteProps> = ({ figure, blurAmount }) => {
     };
   }, [figure.activity, figure.speed, figure.direction]);
 
+  const exitFactor = Math.max(0, currentX > 100
+    ? 1 - (currentX - 100) / 40
+    : (currentX < 0 ? 1 - (0 - currentX) / 40 : 1)
+  );
+
   return (
     <div
       className="absolute"
       style={{
         left: `${currentX}%`,
         top: `100%`,
-        transform: `translate(-50%, -100%) scale(${figure.scale * figure.bodyWidth + (sway * 0.01)}, ${figure.scale * figure.torsoHeight})`,
-        opacity: figure.opacity,
+        transform: `translate(-50%, -100%) scale(${figure.scale * figure.bodyWidth}, ${figure.scale * figure.torsoHeight}) rotate(${sway}deg)`,
+        opacity: figure.opacity * exitFactor,
         display: 'flex',
-        alignItems: 'flex-end',
-        justifyContent: 'center',
-        filter: `blur(${individualBlur}px) grayscale(100%) brightness(0.2)`,
-        transition: 'opacity 1.5s ease-in-out',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        transition: 'opacity 1.5s ease-in-out, transform 0s, left 0s',
         willChange: 'transform, left',
       }}
     >
-      {figure.assetIndex !== undefined ? (
-        <img
-          src={ASSET_URLS[figure.assetIndex]}
-          alt="silhouette"
-          style={{
-            height: '150px',
-            width: 'auto',
-            objectFit: 'contain',
-            mixBlendMode: 'multiply',
-            transform: figure.direction === 'left' ? 'scaleX(-1)' : 'none',
-          }}
-        />
-      ) : (
-        <svg
-          width="100"
-          height="180"
-          viewBox="-50 -150 100 150"
-          fill="#3a3a3a"
-          className="mix-blend-multiply"
-          style={{
-            transform: figure.direction === 'left' ? 'scaleX(-1)' : 'none',
-          }}
-        >
-          <path
-            d={PATHS[figure.activity] || PATHS.stand}
-            transform="translate(0, 10)"
+
+      <div
+        style={{
+          filter: `blur(${individualBlur}px) grayscale(100%) brightness(0.2)`,
+          display: 'flex',
+          alignItems: 'flex-end',
+          justifyContent: 'center',
+        }}
+      >
+        {figure.assetIndex !== undefined ? (
+          <img
+            src={ASSET_URLS[figure.assetIndex]}
+            alt="silhouette"
+            style={{
+              height: '150px',
+              width: 'auto',
+              objectFit: 'contain',
+              mixBlendMode: 'multiply',
+              transform: (figure.direction === 'left' && !ASSETS[figure.assetIndex].direction) ? 'scaleX(-1)' : 'none',
+            }}
           />
-        </svg>
-      )}
+        ) : (
+          <svg
+            width="100"
+            height="180"
+            viewBox="-50 -150 100 150"
+            fill="#3a3a3a"
+            className="mix-blend-multiply"
+            style={{
+              transform: figure.direction === 'left' ? 'scaleX(-1)' : 'none',
+            }}
+          >
+            <path
+              d={PATHS[figure.activity] || PATHS.stand}
+              transform="translate(0, 10)"
+            />
+          </svg>
+        )}
+      </div>
     </div>
   );
 };
