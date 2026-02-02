@@ -2,6 +2,8 @@
 import React from 'react';
 import { RealisticUserFigure, TimeTheme } from '../App';
 import Silhouette from './Silhouette';
+import { WeatherCondition, WeatherIntensity } from '../types';
+import WeatherEffects from './WeatherEffects';
 
 interface CommonSpaceProps {
   figures: RealisticUserFigure[];
@@ -9,16 +11,44 @@ interface CommonSpaceProps {
   glassOpacity: number;
   selectedCity: string | null;
   theme: TimeTheme;
+  weather: WeatherCondition;
+  intensity: WeatherIntensity;
 }
 
-const CommonSpace: React.FC<CommonSpaceProps> = ({ figures, blurAmount, glassOpacity, selectedCity, theme }) => {
+const CommonSpace: React.FC<CommonSpaceProps> = ({ figures, blurAmount, glassOpacity, selectedCity, theme, weather, intensity }) => {
+  // Weather modifiers for background/city
+  const weatherFilter = weather === 'rainy' ? 'grayscale(40%) contrast(1.1) brightness(0.9)' :
+    weather === 'cloudy' ? 'grayscale(20%) brightness(0.95)' :
+      weather === 'snowy' ? 'brightness(1.1) saturate(0.8)' :
+        'none';
+
+  const weatherOverlayColor = weather === 'rainy' ? '#1a1a2e' :
+    weather === 'cloudy' ? '#7f8c8d' :
+      weather === 'snowy' ? '#ecf0f1' :
+        'transparent';
+
+  const weatherOverlayOpacity = weather === 'rainy' ? 0.3 :
+    weather === 'cloudy' ? 0.2 :
+      weather === 'snowy' ? 0.1 :
+        0;
   return (
     <div className="relative w-full h-full overflow-hidden bg-[#fafafa]">
       {/* Background Gradient - Atmospheric base */}
       <div
         className="absolute inset-0 transition-all duration-[3000ms] ease-in-out"
         style={{
-          background: `linear-gradient(to bottom, ${theme.background[0]}, ${theme.background[1]}, ${theme.background[2]})`
+          background: `linear-gradient(to bottom, ${theme.background[0]}, ${theme.background[1]}, ${theme.background[2]})`,
+          filter: weatherFilter
+        }}
+      ></div>
+
+      {/* Weather Overlay for Sky Tone */}
+      <div
+        className="absolute inset-0 transition-opacity duration-[3000ms] pointer-events-none"
+        style={{
+          backgroundColor: weatherOverlayColor,
+          opacity: weatherOverlayOpacity,
+          mixBlendMode: 'overlay'
         }}
       ></div>
 
@@ -35,7 +65,7 @@ const CommonSpace: React.FC<CommonSpaceProps> = ({ figures, blurAmount, glassOpa
             backgroundRepeat: 'no-repeat',
             backgroundSize: '120vw auto',
             opacity: 0.8,
-            filter: `blur(4px) grayscale(60%) brightness(0.9) drop-shadow(0 0 10px ${theme.glow}66)`,
+            filter: `blur(${weather === 'rainy' ? 6 : 4}px) grayscale(${weather === 'rainy' ? 80 : 60}%) brightness(0.9) drop-shadow(0 0 10px ${theme.glow}66)`,
           }}
         />
       )}
@@ -80,6 +110,8 @@ const CommonSpace: React.FC<CommonSpaceProps> = ({ figures, blurAmount, glassOpa
 
       {/* Corner vignette for depth */}
       <div className="absolute inset-0 pointer-events-none z-20 bg-[radial-gradient(circle_at_center,transparent_60%,rgba(0,0,0,0.02)_100%)]"></div>
+
+      <WeatherEffects weather={weather} intensity={intensity} />
     </div>
   );
 };

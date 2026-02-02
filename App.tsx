@@ -4,9 +4,13 @@ import CommonSpace from './components/CommonSpace';
 import { UserFigure } from './types';
 import { getPoeticLocation } from './services/geminiService';
 import { fetchCountryFromCoords } from './services/locationService';
+import { fetchWeather } from './services/weatherService';
+import { WeatherCondition, WeatherIntensity } from './types';
 
 import { socketService } from './services/socketService';
 import { ASSET_URLS, ASSETS, CITY_ASSETS } from './services/figureAssets';
+// Audio files are now loaded from /public/sounds/ via URL string
+
 
 const INITIAL_USERS = 0;
 
@@ -98,6 +102,17 @@ const App: React.FC = () => {
   const [currentTheme, setCurrentTheme] = useState<TimeTheme>(THEMES.day);
   const [isAutoTime, setIsAutoTime] = useState(true);
   const [manualThemeKey, setManualThemeKey] = useState<string>('day');
+  // Weather State
+  const [liveWeather, setLiveWeather] = useState<{ condition: WeatherCondition, intensity: WeatherIntensity }>({ condition: 'sunny', intensity: 'light' });
+  const [manualWeather, setManualWeather] = useState<WeatherCondition>('sunny');
+  const [manualIntensity, setManualIntensity] = useState<WeatherIntensity>('light');
+  const [isAutoWeather, setIsAutoWeather] = useState(true);
+
+  // Derived effective weather
+  const weather = isAutoWeather ? liveWeather.condition : manualWeather;
+  const intensity = isAutoWeather ? liveWeather.intensity : manualIntensity;
+
+
 
   const [countryCache, setCountryCache] = useState<Record<string, string>>({});
 
@@ -120,25 +135,40 @@ const App: React.FC = () => {
     };
   }, []);
 
+
+
   useEffect(() => {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(async (position) => {
         const { latitude, longitude } = position.coords;
         setCoords({ lat: latitude, lng: longitude });
-
-        // Update location on server
-        socketService.updateLocation(latitude, longitude);
-
-        const name = await getPoeticLocation(latitude, longitude);
-        setLocationName(name);
       }, (error) => {
         console.warn("Geolocation access denied or failed. Using fallback coordinates.", error);
         const fallback = { lat: 37.7749, lng: -122.4194 };
         setCoords(fallback);
-        socketService.updateLocation(fallback.lat, fallback.lng);
       });
     }
   }, []);
+
+  // React to coordinate changes (Manual or Geolocation)
+  useEffect(() => {
+    if (!coords) return;
+
+    const updateLocationData = async () => {
+      // Update location on server
+      socketService.updateLocation(coords.lat, coords.lng);
+
+      // Fetch new weather
+      const fetchedWeather = await fetchWeather(coords.lat, coords.lng);
+      setLiveWeather(fetchedWeather);
+
+      // Fetch new location name
+      const name = await getPoeticLocation(coords.lat, coords.lng);
+      setLocationName(name);
+    };
+
+    updateLocationData();
+  }, [coords]);
 
   // Set default city based on closest location
   useEffect(() => {
@@ -300,6 +330,67 @@ const App: React.FC = () => {
     setFigures(newFigures);
   }, [remoteUsers, onlineCount, baseSpeed, figureScale, coords, countryCache]);
 
+  // Audio Logic for Weather
+  // Audio Logic for Weather
+  useEffect(() => {
+    const audioElements: HTMLAudioElement[] = [];
+
+    const playWeatherSound = async () => {
+      // 1. Rain
+      if (weather === 'rainy') {
+        const audio = new Audio('/sounds/rainbg.mp3');
+        audio.loop = true;
+        // Adjust volume based on intensity
+        audio.volume = intensity === 'heavy' ? 1.0 : (intensity === 'light' ? 0.3 : 0.6);
+        try {
+          await audio.play();
+          audioElements.push(audio);
+        } catch (e) {
+          console.warn("Audio play failed (user interaction needed):", e);
+        }
+      }
+
+      // 2. Snow
+      if (weather === 'snowy') {
+        // Base wind/snow sound
+        const bgAudio = new Audio('/sounds/snowbg.wav');
+        bgAudio.loop = true;
+        bgAudio.volume = intensity === 'heavy' ? 0.8 : 0.4;
+        try {
+          await bgAudio.play();
+          audioElements.push(bgAudio);
+        } catch (e) { console.warn(e); }
+
+
+      }
+
+      // 3. Sunny / Cloudy - Crowd Ambience
+      if (weather === 'sunny' || weather === 'cloudy') {
+        const crowdAudio = new Audio('/sounds/crowd.mp3');
+        crowdAudio.loop = true;
+        // Scale volume: 0 at 0 users, max 0.3 at 20+ users
+        const volume = Math.min(0.3, Math.max(0, onlineCount * 0.015));
+        crowdAudio.volume = volume;
+
+        if (volume > 0) {
+          try {
+            await crowdAudio.play();
+            audioElements.push(crowdAudio);
+          } catch (e) { console.warn(e); }
+        }
+      }
+    };
+
+    playWeatherSound();
+
+    return () => {
+      audioElements.forEach(audio => {
+        audio.pause();
+        audio.currentTime = 0;
+      });
+    };
+  }, [weather, intensity, onlineCount]);
+
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -335,6 +426,8 @@ const App: React.FC = () => {
         glassOpacity={glassOpacity}
         selectedCity={selectedCity}
         theme={currentTheme}
+        weather={weather}
+        intensity={intensity}
       />
 
       <div className="absolute top-10 left-10 z-50 pointer-events-none flex flex-col gap-1 max-h-[60vh] overflow-hidden">
@@ -376,12 +469,20 @@ const App: React.FC = () => {
           </h1>
         )}
         {coords && (
-          <p
-            className="text-[9px] font-medium tracking-[0.4em] select-none text-center animate-in fade-in duration-[5000ms] transition-all duration-[3000ms] ease-in-out"
-            style={{ color: currentTheme.subText, opacity: 0.4 }}
-          >
-            {coords.lat.toFixed(4)}° N, {coords.lng.toFixed(4)}° E
-          </p>
+          <div className="flex flex-col items-center gap-1 transition-all duration-[3000ms] ease-in-out">
+            <p
+              className="text-[9px] font-medium tracking-[0.4em] select-none text-center"
+              style={{ color: currentTheme.subText, opacity: 0.4 }}
+            >
+              {coords.lat.toFixed(4)}° N, {coords.lng.toFixed(4)}° E
+            </p>
+            <p
+              className="text-[9px] font-bold uppercase tracking-[0.3em] select-none text-center animate-in fade-in duration-[6000ms]"
+              style={{ color: currentTheme.text, opacity: 0.5 }}
+            >
+              {[intensity, weather].join(' ')}
+            </p>
+          </div>
         )}
       </div>
 
@@ -445,16 +546,32 @@ const App: React.FC = () => {
               />
             </div>
 
+
+
             <div className="flex flex-col gap-2">
               <label
                 className="text-[8px] uppercase tracking-[0.3em] font-bold transition-all duration-[3000ms]"
                 style={{ color: currentTheme.text, opacity: 0.8 }}
               >
-                Vista
+                Location
               </label>
               <select
                 value={selectedCity || ""}
-                onChange={(e) => setSelectedCity(e.target.value || null)}
+                onChange={(e) => {
+                  const url = e.target.value || null;
+                  setSelectedCity(url);
+
+                  // Auto-Teleport to City Coordinates
+                  if (url) {
+                    const cityAsset = CITY_ASSETS.find(c => c.url === url);
+                    if (cityAsset) {
+                      const targetCoords = CITY_COORDINATES[cityAsset.name];
+                      if (targetCoords) {
+                        setCoords({ lat: targetCoords.lat, lng: targetCoords.lng });
+                      }
+                    }
+                  }
+                }}
                 className="bg-transparent border-b outline-none py-1 text-xs w-full transition-all font-mono appearance-none duration-[3000ms]"
                 style={{
                   color: currentTheme.text,
@@ -469,6 +586,74 @@ const App: React.FC = () => {
                 ))}
               </select>
             </div>
+
+            <div className="flex flex-col gap-2">
+              <label
+                className="text-[8px] uppercase tracking-[0.3em] font-bold transition-all duration-[3000ms]"
+                style={{ color: currentTheme.text, opacity: 0.8 }}
+              >
+                Weather
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setIsAutoWeather(true)}
+                  className={`flex-1 py-1 rounded-md text-[10px] font-mono transition-all border duration-[3000ms] ${isAutoWeather ? 'text-white' : 'bg-transparent hover:border-neutral-400'}`}
+                  style={{
+                    backgroundColor: isAutoWeather ? currentTheme.text : 'transparent',
+                    borderColor: isAutoWeather ? currentTheme.text : `${currentTheme.text}44`,
+                    color: isAutoWeather ? (currentTheme.name === 'Night' || currentTheme.name === 'Sunset' ? '#000' : '#fff') : currentTheme.text
+                  }}
+                >
+                  Auto
+                </button>
+                <button
+                  onClick={() => setIsAutoWeather(false)}
+                  className={`flex-1 py-1 rounded-md text-[10px] font-mono transition-all border duration-[3000ms] ${!isAutoWeather ? 'text-white' : 'bg-transparent hover:border-neutral-400'}`}
+                  style={{
+                    backgroundColor: !isAutoWeather ? currentTheme.text : 'transparent',
+                    borderColor: !isAutoWeather ? currentTheme.text : `${currentTheme.text}44`,
+                    color: !isAutoWeather ? (currentTheme.name === 'Night' || currentTheme.name === 'Sunset' ? '#000' : '#fff') : currentTheme.text
+                  }}
+                >
+                  Manual
+                </button>
+              </div>
+            </div>
+
+            {!isAutoWeather && (
+              <div className="flex flex-col gap-2">
+                <select
+                  value={manualWeather}
+                  onChange={(e) => setManualWeather(e.target.value as WeatherCondition)}
+                  className="bg-transparent border-b outline-none py-1 text-xs w-full transition-all font-mono appearance-none duration-[3000ms]"
+                  style={{
+                    color: currentTheme.text,
+                    borderColor: `${currentTheme.text}22`
+                  }}
+                >
+                  <option value="sunny" style={{ color: '#000' }}>Sunny</option>
+                  <option value="cloudy" style={{ color: '#000' }}>Cloudy</option>
+                  <option value="rainy" style={{ color: '#000' }}>Rainy</option>
+                  <option value="snowy" style={{ color: '#000' }}>Snowy</option>
+                </select>
+
+                {manualWeather !== 'sunny' && (
+                  <select
+                    value={manualIntensity}
+                    onChange={(e) => setManualIntensity(e.target.value as WeatherIntensity)}
+                    className="bg-transparent border-b outline-none py-1 text-xs w-full transition-all font-mono appearance-none duration-[3000ms]"
+                    style={{
+                      color: currentTheme.text,
+                      borderColor: `${currentTheme.text}22`
+                    }}
+                  >
+                    <option value="light" style={{ color: '#000' }}>Light</option>
+                    <option value="moderate" style={{ color: '#000' }}>Moderate</option>
+                    <option value="heavy" style={{ color: '#000' }}>Heavy</option>
+                  </select>
+                )}
+              </div>
+            )}
 
             <div className="flex flex-col gap-2">
               <label
@@ -591,7 +776,7 @@ const App: React.FC = () => {
           </div>
         )}
       </div>
-    </div>
+    </div >
   );
 };
 

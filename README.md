@@ -8,20 +8,23 @@ A minimalist digital lounge for collective presence. Anonymous silhouettes from 
 - **Relative Depth**: Figure sizes are relative to their physical distance from you.
 - **Atmosphere Controls**: Manually adjust density, mood, diffusion, and flow pace via the control panel.
 - **Premium Design**: Smooth 3-second transitions and dynamic text contrast for perfect legibility.
+- **Live Weather**: Real-time weather synchronization (Rain, Snow, Sun) with intensity levels.
+- **Atmospheric Audio**: Immersive soundscapes including looping rain, wind, and dynamic crowd chatter that scales with user density.
+- **Teleport**: Instantly jump to global cities via the Location dropdown to experience their real-time local weather.
 
 ## Run Locally
 
 **Prerequisites:** Node.js
 
-### 1. Backend
-- `cd server`
-- `npm install`
-- `npm start` (runs on `http://localhost:3030`)
-
-### 2. Frontend
-- From root: `npm install`
-- Set `GEMINI_API_KEY` in `.env.local`
-- `npm run dev` (runs on `http://localhost:3000`)
+### Quick Start
+1. Install dependencies:
+   - Root: `npm install`
+   - Server: `cd server && npm install`
+2. Set `GEMINI_API_KEY` in `.env.local`
+3. Run both services:
+   - `npm run dev` 
+   - Frontend: `http://localhost:3000`
+   - Backend: `http://localhost:3030`
 
 ## Deployment
 When pushing to main, the CI/CD pipeline will automatically deploy both frontend and backend.

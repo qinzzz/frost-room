@@ -26,3 +26,11 @@ export interface VibeAnalysis {
   suggestedAction: string;
   energyLevel: number;
 }
+
+export type WeatherCondition = 'sunny' | 'rainy' | 'snowy' | 'cloudy';
+export type WeatherIntensity = 'light' | 'moderate' | 'heavy';
+
+export interface WeatherData {
+  condition: WeatherCondition;
+  intensity: WeatherIntensity;
+}

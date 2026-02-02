@@ -1,0 +1,53 @@
+/* Weather Animations */
+
+/* RAIN */
+@keyframes rain-fall {
+  0% { transform: translateY(-100vh); }
+  100% { transform: translateY(100vh); }
+}
+
+.rain-drop {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.4);
+  width: 1px;
+  height: 60px;
+  top: -60px;
+  animation: rain-fall linear infinite;
+}
+
+/* SNOW */
+@keyframes snow-fall {
+  0% { transform: translateY(-10px) translateX(0); }
+  25% { transform: translateY(25vh) translateX(10px); }
+  50% { transform: translateY(50vh) translateX(-10px); }
+  75% { transform: translateY(75vh) translateX(10px); }
+  100% { transform: translateY(100vh) translateX(0); }
+}
+
+.snow-flake {
+  position: absolute;
+  background: white;
+  border-radius: 50%;
+  top: -10px;
+  animation: snow-fall linear infinite;
+}
+
+/* CLOUDS */
+@keyframes cloud-drift {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100vw); }
+}
+
+.cloud-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 200%;
+  height: 100%;
+  background-repeat: repeat-x;
+  background-size: 50% 100%;
+  opacity: 0.3;
+  pointer-events: none;
+  animation: cloud-drift linear infinite;
+  filter: blur(20px);
+}
