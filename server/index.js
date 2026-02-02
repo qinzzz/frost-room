@@ -60,8 +60,8 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3030;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT} (0.0.0.0)`);
+server.listen(PORT, () => {
+  console.log(`Atmosphere Server Online | Listening on Port ${PORT}`);
 });
 
 server.on('error', (err) => {
