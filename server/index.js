@@ -32,8 +32,8 @@ const users = {};
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
 
-  // Initial update to all clients about the new user (count only for now)
-  io.emit('online_count', Object.keys(users).length);
+  // Initial update to all clients about the new user
+  io.emit('online_count', io.engine.clientsCount);
 
   socket.on('update_location', (data) => {
     // data should be { lat: number, lng: number }
@@ -43,9 +43,10 @@ io.on('connection', (socket) => {
       id: socket.id
     };
 
-    // Broadcast the full list of users with locations to all clients
+    // Broadcast the updated list of users with locations
     io.emit('users_list', Object.values(users));
-    io.emit('online_count', Object.keys(users).length);
+    // We already emitted the count on connection, but let's sync just in case
+    io.emit('online_count', io.engine.clientsCount);
   });
 
   socket.on('disconnect', () => {
@@ -54,7 +55,7 @@ io.on('connection', (socket) => {
 
     // Broadcast updated list and count
     io.emit('users_list', Object.values(users));
-    io.emit('online_count', Object.keys(users).length);
+    io.emit('online_count', io.engine.clientsCount);
   });
 });
 
